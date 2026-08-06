@@ -80,4 +80,4 @@ async def embed_error(ctx: commands.Context, error):
     )
 
 
-bot.run(os.getenv("MTUzNDk5NDIwMTQ4ODY1ODU5Mg.GLLUc9.FxMpfc20Uh9veS6WcQxvl7McVl-_Hu8FoM3UNA"))
+bot.run(os.getenv("DISCORD_TOKEN"))
