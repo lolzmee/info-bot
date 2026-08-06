@@ -229,6 +229,19 @@ async def mute_user(ctx, member: discord.Member, duration: str):
     except Exception as e:
         await ctx.send("❌ I don't have permission to mute this user. Make sure my role is higher than theirs.")
 
+@bot.command(name="unmute")
+@commands.has_permissions(moderate_members=True)
+async def unmute_user(ctx, member: discord.Member):
+    """Usage: .unmute @user"""
+    try:
+        # Setting the timeout to None instantly lifts the mute
+        await member.timeout(None, reason=f"Unmuted by {ctx.author.name}")
+        await ctx.send(f"🔊 **{member.name}** has been unmuted.")
+    except Exception as e:
+        await ctx.send("❌")
+
+
+
 @bot.command(name="ban")
 @commands.has_permissions(ban_members=True)
 async def ban_user(ctx, member: discord.Member, *, reason="No reason provided."):
@@ -241,7 +254,7 @@ async def ban_user(ctx, member: discord.Member, *, reason="No reason provided.")
         embed.add_field(name="Banned By", value=ctx.author.mention)
         await ctx.send(embed=embed)
     except:
-        await ctx.send("❌ I couldn't ban that user. Check my role permissions.")
+        await ctx.send("❌")
 
 @bot.command(name="role")
 @commands.has_permissions(manage_roles=True)
@@ -249,7 +262,7 @@ async def add_role(ctx, member: discord.Member, *, role_name: str):
     """Usage: .role @user RoleName"""
     role = discord.utils.get(ctx.guild.roles, name=role_name)
     if not role:
-        return await ctx.send(f"❌ Could not find a role named `{role_name}`.")
+        return await ctx.send(f"❌ `{role_name}`.")
     
     try:
         if role in member.roles:
@@ -259,7 +272,7 @@ async def add_role(ctx, member: discord.Member, *, role_name: str):
             await member.add_roles(role)
             await ctx.send(f"➕ Granted **{role.name}** to {member.mention}.")
     except:
-        await ctx.send("❌ I don't have permission to manage this role. Ensure my bot role is higher in the server settings.")
+        await ctx.send("❌.")
 
 
 
