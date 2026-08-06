@@ -266,6 +266,74 @@ async def add_role(ctx, member: discord.Member, *, role_name: str):
     except:
         await ctx.send("❌ I don't have permission to manage this role. Ensure my bot role is higher in the server settings.")
 
-# (Keep your existing .embed and .nuke commands here)
+
+
+# ---------------------------------------------------------
+# Keep your existing .embed and .nuke commands here
+# ---------------------------------------------------------
+
+@bot.command(name="embed")
+@commands.has_permissions(manage_messages=True)
+async def create_embed(ctx: commands.Context):
+  try:
+    await ctx.message.delete()
+  except Exception:
+    pass
+
+  prompt = await ctx.send(
+      f"📝 {ctx.author.mention}, you have **10 minutes** to send the message for"
+      " your embed below."
+  )
+
+  def check(m: discord.Message):
+    return m.author == ctx.author and m.channel == ctx.channel
+
+  try:
+    user_msg = await bot.wait_for("message", check=check, timeout=600.0)
+    content = user_msg.content
+
+    try:
+      await user_msg.delete()
+      await prompt.delete()
+    except Exception:
+      pass
+
+    embed = discord.Embed(
+        description=content, color=discord.Color.from_rgb(148, 48, 255)
+    )
+    await ctx.send(embed=embed)
+
+  except asyncio.TimeoutError:
+    try:
+      await prompt.edit(
+          content="⏰ **Time expired!** Embed creation timed out.",
+          delete_after=10,
+      )
+    except Exception:
+      pass
+
+
+@bot.command(name="nuke")
+@commands.has_permissions(manage_channels=True)
+async def nuke_channel(ctx: commands.Context):
+  position = ctx.channel.position
+  category = ctx.channel.category
+
+  new_channel = await ctx.channel.clone(reason=f"Nuked by {ctx.author.name}")
+  await new_channel.edit(position=position, category=category)
+  await ctx.channel.delete()
+
+  embed = discord.Embed(
+      title="Nuked",
+      description="All chat history has been completely cleared.",
+      color=discord.Color.from_rgb(148, 48, 255),
+  )
+  embed.set_footer(text=f"Nuked by {ctx.author.name}")
+  embed.set_image(
+      url="https://media.tenor.com/gi23E8Gg5bUAAAAC/explosion-boom.gif"
+  )
+
+  await new_channel.send(embed=embed)
+
 
 bot.run(os.getenv("DISCORD_TOKEN"))
