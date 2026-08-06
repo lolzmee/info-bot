@@ -353,13 +353,13 @@ async def nuke_channel(ctx: commands.Context):
   await ctx.channel.delete()
 
   embed = discord.Embed(
-      title="Nuked",
-      description="All chat history has been completely cleared.",
+      title="wiped",
+      description="w opsec",
       color=discord.Color.from_rgb(148, 48, 255),
   )
   embed.set_footer(text=f"Nuked by {ctx.author.name}")
   embed.set_image(
-      url="https://media.tenor.com/gi23E8Gg5bUAAAAC/explosion-boom.gif"
+      url="https://klipy.com/gifs/mullvad-opsec"
   )
 
   await new_channel.send(embed=embed)
