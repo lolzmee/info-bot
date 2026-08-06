@@ -53,7 +53,7 @@ async def create_embed(ctx: commands.Context):
     # 5. Create and send the final clean embed
     embed = discord.Embed(
         description=content,
-        color=discord.Color.from_rgb(59, 130, 246),  # Clean modern blue
+        color=discord.Color.from_rgb(139, 92, 246),  # Clean modern purple
     )
 
     await ctx.send(embed=embed)
@@ -103,7 +103,7 @@ async def nuke_channel(ctx: commands.Context):
     embed = discord.Embed(
         title="💥 Channel Nuked",
         description="All chat history has been completely cleared.",
-        color=discord.Color.from_rgb(59, 130, 246)
+        color=discord.Color.from_rgb(139, 92, 246)  # Clean modern purple (#8B5CF6)
     )
     embed.set_footer(text=f"Nuked by {ctx.author.name}")
     
