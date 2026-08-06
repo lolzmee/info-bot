@@ -357,7 +357,7 @@ async def nuke_channel(ctx: commands.Context):
       description="w opsec",
       color=discord.Color.from_rgb(148, 48, 255),
   )
-  embed.set_footer(text=f"Nuked by {ctx.author.name}")
+  embed.set_footer(text=f"wiped by {ctx.author.name}")
   embed.set_image(
       url="https://static2.klipy.com/ii/4493325008d34b7bf8cd6813cd5c1619/63/fc/G1EFGKpkYpYSaWAmTu.gif"
   )
