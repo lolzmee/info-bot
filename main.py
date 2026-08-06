@@ -80,4 +80,43 @@ async def embed_error(ctx: commands.Context, error):
     )
 
 
+
+# NUKEE
+
+@bot.command(name="nuke")
+@commands.has_permissions(manage_channels=True)
+async def nuke_channel(ctx: commands.Context):
+    # Get the channel's original position and category so the new one goes in the exact same spot
+    position = ctx.channel.position
+    category = ctx.channel.category
+
+    # Clone the channel
+    new_channel = await ctx.channel.clone(reason=f"Nuked by {ctx.author.name}")
+    
+    # Move the new channel to the old channel's position
+    await new_channel.edit(position=position, category=category)
+    
+    # Delete the old channel completely
+    await ctx.channel.delete()
+
+    # Send a confirmation message in the fresh new channel
+    embed = discord.Embed(
+        title="💥 Channel Nuked",
+        description="All chat history has been completely cleared.",
+        color=discord.Color.from_rgb(59, 130, 246)
+    )
+    embed.set_footer(text=f"Nuked by {ctx.author.name}")
+    
+    # Optional: Send a cool GIF or image
+    embed.set_image(url="https://media.tenor.com/gi23E8Gg5bUAAAAC/explosion-boom.gif")
+    
+    await new_channel.send(embed=embed)
+
+@nuke_channel.error
+async def nuke_error(ctx: commands.Context, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You need `Manage Channels` permissions to nuke a channel!", delete_after=5)
+
+
+
 bot.run(os.getenv("DISCORD_TOKEN"))
