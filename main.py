@@ -100,9 +100,20 @@ class LiveTicketView(discord.ui.View):
 # ---------------------------------------------------------
 # 2. INTERACTIVE BUILDER SYSTEM (What admins use)
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+# MODAL INPUTS (UPDATING TEXT & DROPDOWN OPTIONS)
+# ---------------------------------------------------------
 class TextEditModal(discord.ui.Modal, title='Edit Panel Text'):
-    emb_title = discord.ui.TextInput(label='Title', default='Gulp Support Center', max_length=100)
-    emb_desc = discord.ui.TextInput(label='Description', style=discord.TextStyle.paragraph, max_length=2000)
+    emb_title = discord.ui.TextInput(
+        label='Title', 
+        default='Gulp Support Center', 
+        max_length=256
+    )
+    emb_desc = discord.ui.TextInput(
+        label='Description', 
+        style=discord.TextStyle.paragraph, 
+        max_length=4000
+    )
 
     def __init__(self, builder_view):
         super().__init__()
@@ -115,10 +126,21 @@ class TextEditModal(discord.ui.Modal, title='Edit Panel Text'):
         self.builder_view.embed.description = self.emb_desc.value
         await interaction.response.edit_message(embed=self.builder_view.embed, view=self.builder_view)
 
+
 class AddCategoryModal(discord.ui.Modal, title='Add Dropdown Category'):
-    cat_label = discord.ui.TextInput(label='Category Name (e.g., Support)', max_length=50)
-    cat_desc = discord.ui.TextInput(label='Description (e.g., General help)', max_length=100)
-    cat_emoji = discord.ui.TextInput(label='Emoji (Paste an emoji like 💳)', max_length=10, required=False)
+    cat_label = discord.ui.TextInput(
+        label='Category Name (e.g., Support)', 
+        max_length=100
+    )
+    cat_desc = discord.ui.TextInput(
+        label='Description (e.g., General help)', 
+        max_length=100
+    )
+    cat_emoji = discord.ui.TextInput(
+        label='Emoji (Paste standard or custom emoji string)', 
+        max_length=100, 
+        required=False
+    )
 
     def __init__(self, builder_view):
         super().__init__()
@@ -132,7 +154,6 @@ class AddCategoryModal(discord.ui.Modal, title='Add Dropdown Category'):
             "emoji": emoji_val
         })
         
-        # Update the builder embed to show the new category was added
         self.builder_view.embed.add_field(
             name=f"Added Option: {emoji_val} {self.cat_label.value}", 
             value=self.cat_desc.value, 
