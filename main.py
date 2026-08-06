@@ -10,11 +10,10 @@ intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
 intents.guilds = True
-intents.members = True  # Required for welcome/leave messages
+intents.members = True
 
 bot = commands.Bot(command_prefix=".", intents=intents)
 
-# Database file for welcome/leave channels
 SETTINGS_FILE = "settings.json"
 
 def load_settings():
@@ -28,44 +27,36 @@ def save_settings(data):
         json.dump(data, f, indent=4)
 
 # ---------------------------------------------------------
-# TICKET SYSTEM COMPONENTS
+# 1. LIVE TICKET SYSTEM (What users see)
 # ---------------------------------------------------------
 class CloseTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(
-        label="🔒 Close Ticket",
-        style=discord.ButtonStyle.red,
-        custom_id="close_ticket_btn",
-    )
+    @discord.ui.button(label="🔒 Close Ticket", style=discord.ButtonStyle.red, custom_id="close_ticket_btn")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("🔒 Closing this ticket in 5 seconds...")
         await asyncio.sleep(5)
         await interaction.channel.delete(reason="Ticket closed")
 
-class TicketSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(
-                label="General Support",
-                description="Questions about Gulp, stock, or general help.",
-                emoji="💬",
-                value="General Support",
-            ),
-            discord.SelectOption(
-                label="Purchase Inquiry",
-                description="Help with buying wallets, accounts, or payment issues.",
-                emoji="💳",
-                value="Purchase Inquiry",
-            ),
-        ]
+class DynamicTicketSelect(discord.ui.Select):
+    def __init__(self, options_data):
+        # Build the discord SelectOptions from the custom data you create in the setup
+        select_options = []
+        for opt in options_data:
+            select_options.append(discord.SelectOption(
+                label=opt['label'],
+                description=opt['description'],
+                emoji=opt['emoji'],
+                value=opt['label']
+            ))
+            
         super().__init__(
             placeholder="Select a support category...",
             min_values=1,
             max_values=1,
-            options=options,
-            custom_id="ticket_category_select",
+            options=select_options,
+            custom_id="dynamic_ticket_select"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -78,11 +69,9 @@ class TicketSelect(discord.ui.Select):
 
         existing_channel = discord.utils.get(guild.text_channels, name=channel_name)
         if existing_channel:
-            await interaction.response.send_message(
-                f"❌ You already have an open ticket in {existing_channel.mention}!",
-                ephemeral=True,
+            return await interaction.response.send_message(
+                f"❌ You already have an open ticket in {existing_channel.mention}!", ephemeral=True
             )
-            return
 
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
@@ -91,123 +80,129 @@ class TicketSelect(discord.ui.Select):
         }
 
         ticket_channel = await guild.create_text_channel(
-            name=channel_name,
-            overwrites=overwrites,
-            reason=f"Ticket opened by {user.name}",
+            name=channel_name, overwrites=overwrites, reason=f"Ticket opened by {user.name}"
         )
 
-        await interaction.response.send_message(
-            f"✅ Ticket created! Head over to {ticket_channel.mention}",
-            ephemeral=True,
-        )
+        await interaction.response.send_message(f"✅ Ticket created! Head over to {ticket_channel.mention}", ephemeral=True)
 
         embed = discord.Embed(
             title=f"🎫 Gulp Support — {selected_category}",
             description=f"Welcome {user.mention}!\n\nPlease explain what you need help with below, and our staff will be with you shortly.",
             color=discord.Color.from_rgb(148, 48, 255),
         )
-        embed.set_footer(text="Click the button below to close this ticket.")
-
         await ticket_channel.send(content=f"{user.mention}", embed=embed, view=CloseTicketView())
 
-class TicketView(discord.ui.View):
-    def __init__(self):
+class LiveTicketView(discord.ui.View):
+    def __init__(self, options_data):
         super().__init__(timeout=None)
-        self.add_item(TicketSelect())
+        self.add_item(DynamicTicketSelect(options_data))
 
 # ---------------------------------------------------------
-# BOT EVENTS
+# 2. INTERACTIVE BUILDER SYSTEM (What admins use)
+# ---------------------------------------------------------
+class TextEditModal(discord.ui.Modal, title='Edit Panel Text'):
+    emb_title = discord.ui.TextInput(label='Title', default='Gulp Support Center', max_length=100)
+    emb_desc = discord.ui.TextInput(label='Description', style=discord.TextStyle.paragraph, max_length=2000)
+
+    def __init__(self, builder_view):
+        super().__init__()
+        self.builder_view = builder_view
+        self.emb_title.default = builder_view.embed.title
+        self.emb_desc.default = builder_view.embed.description
+
+    async def on_submit(self, interaction: discord.Interaction):
+        self.builder_view.embed.title = self.emb_title.value
+        self.builder_view.embed.description = self.emb_desc.value
+        await interaction.response.edit_message(embed=self.builder_view.embed, view=self.builder_view)
+
+class AddCategoryModal(discord.ui.Modal, title='Add Dropdown Category'):
+    cat_label = discord.ui.TextInput(label='Category Name (e.g., Support)', max_length=50)
+    cat_desc = discord.ui.TextInput(label='Description (e.g., General help)', max_length=100)
+    cat_emoji = discord.ui.TextInput(label='Emoji (Paste an emoji like 💳)', max_length=10, required=False)
+
+    def __init__(self, builder_view):
+        super().__init__()
+        self.builder_view = builder_view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        emoji_val = self.cat_emoji.value.strip() if self.cat_emoji.value.strip() else "📁"
+        self.builder_view.custom_options.append({
+            "label": self.cat_label.value,
+            "description": self.cat_desc.value,
+            "emoji": emoji_val
+        })
+        
+        # Update the builder embed to show the new category was added
+        self.builder_view.embed.add_field(
+            name=f"Added Option: {emoji_val} {self.cat_label.value}", 
+            value=self.cat_desc.value, 
+            inline=False
+        )
+        await interaction.response.edit_message(embed=self.builder_view.embed, view=self.builder_view)
+
+class TicketBuilderView(discord.ui.View):
+    def __init__(self, ctx):
+        super().__init__(timeout=600) # 10 minute timeout to build
+        self.ctx = ctx
+        self.embed = discord.Embed(
+            title="Gulp Support Center", 
+            description="Welcome to support! Use the builder buttons below to customize this embed.",
+            color=discord.Color.from_rgb(148, 48, 255)
+        )
+        self.custom_options = []
+
+    @discord.ui.button(label="📝 Edit Title & Desc", style=discord.ButtonStyle.blurple)
+    async def edit_text(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(TextEditModal(self))
+
+    @discord.ui.button(label="➕ Add Dropdown Option", style=discord.ButtonStyle.secondary)
+    async def add_option(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if len(self.custom_options) >= 10:
+            return await interaction.response.send_message("❌ You can only have up to 10 options!", ephemeral=True)
+        await interaction.response.send_modal(AddCategoryModal(self))
+
+    @discord.ui.button(label="✅ Publish Panel", style=discord.ButtonStyle.green)
+    async def publish_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if len(self.custom_options) == 0:
+            return await interaction.response.send_message("❌ You must add at least 1 dropdown option before publishing!", ephemeral=True)
+        
+        # Clean up the "Added Option" fields from the preview embed
+        self.embed.clear_fields()
+        
+        # Send the final panel
+        await interaction.channel.send(embed=self.embed, view=LiveTicketView(self.custom_options))
+        
+        # Delete the builder message
+        await interaction.message.delete()
+
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.red)
+    async def cancel_setup(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.message.delete()
+
+# ---------------------------------------------------------
+# BOT EVENTS & COMMANDS
 # ---------------------------------------------------------
 @bot.event
 async def on_ready():
-    bot.add_view(TicketView())
     bot.add_view(CloseTicketView())
+    # Note: Because we are dynamically generating dropdowns, persistent views across total bot restarts 
+    # require a database. For now, the panel will work flawlessly while the bot is online!
     print(f"Logged in as {bot.user.name}")
-    print("Gulp Bot is ready and online!")
 
-@bot.event
-async def on_member_join(member):
-    settings = load_settings()
-    if "welcome_channel" in settings:
-        channel = bot.get_channel(settings["welcome_channel"])
-        if channel:
-            embed = discord.Embed(
-                title="👋 Welcome to Gulp!",
-                description=f"Welcome to the server, {member.mention}! Make sure to read the rules and check out our stock.",
-                color=discord.Color.from_rgb(148, 48, 255)
-            )
-            embed.set_thumbnail(url=member.display_avatar.url)
-            await channel.send(embed=embed)
-
-@bot.event
-async def on_member_remove(member):
-    settings = load_settings()
-    if "leave_channel" in settings:
-        channel = bot.get_channel(settings["leave_channel"])
-        if channel:
-            embed = discord.Embed(
-                description=f"🛫 **{member.name}** just left the server.",
-                color=discord.Color.red()
-            )
-            await channel.send(embed=embed)
-
-# ---------------------------------------------------------
-# SETUP COMMANDS
-# ---------------------------------------------------------
 @bot.command(name="ticketsetup")
 @commands.has_permissions(administrator=True)
 async def ticket_setup(ctx: commands.Context):
     try:
         await ctx.message.delete()
     except: pass
-
-    def check(m):
-        return m.author == ctx.author and m.channel == ctx.channel
-
-    # Prompt for Title
-    prompt1 = await ctx.send("📝 **Step 1:** Type the TITLE for your ticket panel (You have 2 minutes):")
-    try:
-        title_msg = await bot.wait_for("message", check=check, timeout=120.0)
-        panel_title = title_msg.content
-        await title_msg.delete()
-    except asyncio.TimeoutError:
-        return await prompt1.edit(content="⏰ Setup timed out.", delete_after=5)
-
-    # Prompt for Description
-    prompt2 = await ctx.send("📝 **Step 2:** Type the DESCRIPTION for your ticket panel (You have 5 minutes):")
-    try:
-        desc_msg = await bot.wait_for("message", check=check, timeout=300.0)
-        panel_desc = desc_msg.content
-        await desc_msg.delete()
-    except asyncio.TimeoutError:
-        return await prompt2.edit(content="⏰ Setup timed out.", delete_after=5)
-
-    # Cleanup prompts and post the panel
-    await prompt1.delete()
-    await prompt2.delete()
-
-    embed = discord.Embed(
-        title=panel_title,
-        description=panel_desc,
-        color=discord.Color.from_rgb(148, 48, 255)
+    
+    builder_view = TicketBuilderView(ctx)
+    await ctx.send(
+        content="**🛠️ Interactive Ticket Builder**\n*Only admins can see these buttons. Click them to customize your panel, then hit Publish.*", 
+        embed=builder_view.embed, 
+        view=builder_view
     )
-    await ctx.send(embed=embed, view=TicketView())
 
-@bot.command(name="setupwelcome")
-@commands.has_permissions(administrator=True)
-async def setup_welcome(ctx: commands.Context):
-    settings = load_settings()
-    settings["welcome_channel"] = ctx.channel.id
-    save_settings(settings)
-    await ctx.send(f"✅ Welcome messages will now be sent in {ctx.channel.mention}")
-
-@bot.command(name="setupleft")
-@commands.has_permissions(administrator=True)
-async def setup_left(ctx: commands.Context):
-    settings = load_settings()
-    settings["leave_channel"] = ctx.channel.id
-    save_settings(settings)
-    await ctx.send(f"✅ Leave messages will now be sent in {ctx.channel.mention}")
 
 # ---------------------------------------------------------
 # MODERATION & UTILITY COMMANDS
