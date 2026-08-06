@@ -359,7 +359,7 @@ async def nuke_channel(ctx: commands.Context):
   )
   embed.set_footer(text=f"Nuked by {ctx.author.name}")
   embed.set_image(
-      url="https://klipy.com/gifs/mullvad-opsec"
+      url="https://klipy.com/gifs/its-called-opsec-you-wouldnt-understand-1"
   )
 
   await new_channel.send(embed=embed)
