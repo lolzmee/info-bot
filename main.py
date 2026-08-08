@@ -439,39 +439,34 @@ async def on_presence_update(before, after):
         pass
 
 # ---------------------------------------------------------
-# STICKY BOT STATUS SYSTEM
+# CLEAN STICKY EMBED SYSTEM
 # ---------------------------------------------------------
 # This dictionary remembers your status settings in the background
 sticky_status = {
     "channel_id": None,
     "message_id": None,
-    "title": "🟢 Gulp Status",
-    "desc": "All systems operational. Bot is online and ready for requests."
+    "title": "Gulp Status",
+    "desc": "Add /gulp to your custom status to unlock rewards."
 }
 
-def create_status_embed(title, desc, client):
-    latency = round(client.latency * 1000)
-    now = discord.utils.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-
+def create_status_embed(title, desc):
+    # Pure embed containing only title and description
     embed = discord.Embed(
         title=title,
         description=desc,
         color=0x2B2D31
     )
-    embed.add_field(name="Status", value="🟢 **Online & Active**", inline=True)
-    embed.add_field(name="Ping", value=f"⚡ **{latency}ms**", inline=True)
-    embed.set_footer(text=f"Last Checked: {now}")
     return embed
 
-class BotStatusModal(discord.ui.Modal, title='Setup Bot Status Embed'):
+class BotStatusModal(discord.ui.Modal, title='Setup Sticky Embed'):
     emb_title = discord.ui.TextInput(
         label='Status Title', 
-        default='🟢 Gulp Status', 
+        default='Gulp Status', 
         max_length=256
     )
     emb_desc = discord.ui.TextInput(
         label='Custom Message', 
-        default='All systems operational. Bot is online and ready for requests.', 
+        default='Add /gulp to your custom status to instantly unlock rewards.', 
         style=discord.TextStyle.paragraph, 
         max_length=4000
     )
@@ -491,11 +486,11 @@ class BotStatusModal(discord.ui.Modal, title='Setup Bot Status Embed'):
                 pass
 
         # Send the new one and save its ID
-        embed = create_status_embed(sticky_status["title"], sticky_status["desc"], interaction.client)
+        embed = create_status_embed(sticky_status["title"], sticky_status["desc"])
         new_msg = await interaction.channel.send(embed=embed)
         sticky_status["message_id"] = new_msg.id
 
-        await interaction.response.send_message("✅ Sticky bot status enabled! It will now lock to the bottom.", ephemeral=True)
+        await interaction.response.send_message("✅ Sticky embed enabled! It will now lock to the bottom.", ephemeral=True)
 
 class StatusLaunchView(discord.ui.View):
     def __init__(self):
@@ -543,7 +538,7 @@ async def on_message(message):
                 pass
         
         # 2. Resend the embed at the bottom
-        embed = create_status_embed(sticky_status["title"], sticky_status["desc"], bot)
+        embed = create_status_embed(sticky_status["title"], sticky_status["desc"])
         new_msg = await message.channel.send(embed=embed)
         
         # 3. Save the new message ID so we can delete it next time
