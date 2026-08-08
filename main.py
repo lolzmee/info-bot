@@ -299,49 +299,65 @@ async def add_role(ctx, member: discord.Member, *, role_name: str):
 
 
 # ---------------------------------------------------------
-# Keep your existing .embed and .nuke commands here
+# NORMAL EMBED BUILDER (.embed)
 # ---------------------------------------------------------
+class NormalEmbedModal(discord.ui.Modal, title='Create Embed'):
+    emb_title = discord.ui.TextInput(
+        label='Embed Title (Optional)', 
+        default='', 
+        max_length=256,
+        required=False
+    )
+    emb_desc = discord.ui.TextInput(
+        label='Embed Message', 
+        style=discord.TextStyle.paragraph, 
+        max_length=4000
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            description=self.emb_desc.value,
+            color=0x2B2D31  # Matches your clean invisible edge theme
+        )
+        
+        # Only add a title if you actually typed one
+        if self.emb_title.value.strip():
+            embed.title = self.emb_title.value.strip()
+
+        # Send the one-time embed to the channel
+        await interaction.channel.send(embed=embed)
+        
+        # Acknowledge the action so the modal closes smoothly
+        await interaction.response.send_message("✅ Embed posted!", ephemeral=True)
+
+
+class NormalEmbedLaunchView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+
+    @discord.ui.button(label="📝 Create Embed", style=discord.ButtonStyle.blurple)
+    async def open_embed_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(NormalEmbedModal())
+        await interaction.message.delete()
+
 
 @bot.command(name="embed")
 @commands.has_permissions(manage_messages=True)
 async def create_embed(ctx: commands.Context):
-  try:
-    await ctx.message.delete()
-  except Exception:
-    pass
-
-  prompt = await ctx.send(
-      f"📝 {ctx.author.mention}, you have **10 minutes** to send the message for"
-      " your embed below."
-  )
-
-  def check(m: discord.Message):
-    return m.author == ctx.author and m.channel == ctx.channel
-
-  try:
-    user_msg = await bot.wait_for("message", check=check, timeout=600.0)
-    content = user_msg.content
-
+    """Usage: .embed (Opens a pop-up to create a standard embed)"""
     try:
-      await user_msg.delete()
-      await prompt.delete()
+        await ctx.message.delete()
     except Exception:
-      pass
-
-    embed = discord.Embed(
-        description=content, color=discord.Color.from_rgb(148, 48, 255)
+        pass
+    
+    await ctx.send(
+        content="Click the button below to build your **Embed**:",
+        view=NormalEmbedLaunchView(),
+        delete_after=180
     )
-    await ctx.send(embed=embed)
-
-  except asyncio.TimeoutError:
-    try:
-      await prompt.edit(
-          content="⏰ **Time expired!** Embed creation timed out.",
-          delete_after=10,
-      )
-    except Exception:
-      pass
-
+# ---------------------------------------------------------
+# .NUKE
+# ---------------------------------------------------------
 
 @bot.command(name="nuke")
 @commands.has_permissions(manage_channels=True)
