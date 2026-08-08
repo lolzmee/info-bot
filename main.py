@@ -365,49 +365,39 @@ async def nuke_channel(ctx: commands.Context):
   await new_channel.send(embed=embed)
 
 # ---------------------------------------------------------
-# WELCOME & LEAVE SYSTEM
+# PERMANENT CHANNEL CONFIGURATION (Saved on GitHub)
+# ---------------------------------------------------------
+# Paste your channel IDs inside the quotes below:
+WELCOME_CHANNEL_ID = 1525410569329311785  # Replace with your welcome channel ID
+LEAVE_CHANNEL_ID = 1526554179110310019    # Replace with your leave channel ID
+
+
+# ---------------------------------------------------------
+# AUTOMATIC WELCOME & LEAVE EVENTS
 # ---------------------------------------------------------
 @bot.event
 async def on_member_join(member):
-    settings = load_settings()
-    if "welcome_channel" in settings:
-        channel = bot.get_channel(settings["welcome_channel"])
-        if channel:
-            embed = discord.Embed(
-                title="👋 Welcome to Gulp!",
-                description=f"nigga {member.mention}! joined",
-                color=discord.Color.from_rgb(148, 48, 255)
-            )
-            embed.set_thumbnail(url=member.display_avatar.url)
-            await channel.send(embed=embed)
+    # Sends automatically to WELCOME_CHANNEL_ID
+    channel = bot.get_channel(int(WELCOME_CHANNEL_ID))
+    if channel:
+        embed = discord.Embed(
+            title="👋 Welcome to Gulp!",
+            description=f"Welcome to the server, {member.mention}! Make sure to read the rules and check out our stock.",
+            color=0x2B2D31
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        await channel.send(embed=embed)
 
 @bot.event
 async def on_member_remove(member):
-    settings = load_settings()
-    if "leave_channel" in settings:
-        channel = bot.get_channel(settings["leave_channel"])
-        if channel:
-            embed = discord.Embed(
-                description=f"🛫 **{member.name}** pooron left",
-                color=discord.Color.red()
-            )
-            await channel.send(embed=embed)
-
-@bot.command(name="setupwelcome")
-@commands.has_permissions(administrator=True)
-async def setup_welcome(ctx: commands.Context):
-    settings = load_settings()
-    settings["welcome_channel"] = ctx.channel.id
-    save_settings(settings)
-    await ctx.send(f"✅ Welcome messages will now be sent in {ctx.channel.mention}")
-
-@bot.command(name="setupleft")
-@commands.has_permissions(administrator=True)
-async def setup_left(ctx: commands.Context):
-    settings = load_settings()
-    settings["leave_channel"] = ctx.channel.id
-    save_settings(settings)
-    await ctx.send(f"✅ Leave messages will now be sent in {ctx.channel.mention}")
+    # Sends automatically to LEAVE_CHANNEL_ID
+    channel = bot.get_channel(int(LEAVE_CHANNEL_ID))
+    if channel:
+        embed = discord.Embed(
+            description=f"🛫 **{member.name}** just left the server.",
+            color=discord.Color.red()
+        )
+        await channel.send(embed=embed)
 
 
 # ---------------------------------------------------------
