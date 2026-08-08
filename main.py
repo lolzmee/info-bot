@@ -11,6 +11,7 @@ intents.messages = True
 intents.message_content = True
 intents.guilds = True
 intents.members = True
+intents.presences = True
 
 bot = commands.Bot(command_prefix=".", intents=intents)
 
@@ -407,6 +408,45 @@ async def setup_left(ctx: commands.Context):
     settings["leave_channel"] = ctx.channel.id
     save_settings(settings)
     await ctx.send(f"✅ Leave messages will now be sent in {ctx.channel.mention}")
+
+
+# ---------------------------------------------------------
+# AUTO STATUS ROLE SYSTEM
+# ---------------------------------------------------------
+@bot.event
+async def on_presence_update(before, after):
+    # Change this to the exact role name you want to give
+    role_name = "/gulp" 
+    target_text = "/gulp"
+
+    # Ensure we are inside a server, not a DM
+    if not isinstance(after, discord.Member):
+        return
+        
+    role = discord.utils.get(after.guild.roles, name=role_name)
+    if not role:
+        return  # The role doesn't exist in your server
+
+    # Check if the user has /gulp in their custom status
+    has_target_status = False
+    for activity in after.activities:
+        if isinstance(activity, discord.CustomActivity):
+            if activity.name and target_text.lower() in activity.name.lower():
+                has_target_status = True
+                break
+                
+    try:
+        # Give role if they added /gulp
+        if has_target_status and role not in after.roles:
+            await after.add_roles(role)
+            
+        # Remove role if they took /gulp out of their status
+        elif not has_target_status and role in after.roles:
+            await after.remove_roles(role)
+            
+    except Exception:
+        # Fails silently if the bot's role is too low in Server Settings to manage roles
+        pass
 
 
 bot.run(os.getenv("DISCORD_TOKEN"))
