@@ -438,5 +438,116 @@ async def on_presence_update(before, after):
         # Fails silently if the bot's role is too low in Server Settings to manage roles
         pass
 
+# ---------------------------------------------------------
+# STICKY BOT STATUS SYSTEM
+# ---------------------------------------------------------
+# This dictionary remembers your status settings in the background
+sticky_status = {
+    "channel_id": None,
+    "message_id": None,
+    "title": "🟢 Gulp Status",
+    "desc": "All systems operational. Bot is online and ready for requests."
+}
+
+def create_status_embed(title, desc, client):
+    latency = round(client.latency * 1000)
+    now = discord.utils.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    embed = discord.Embed(
+        title=title,
+        description=desc,
+        color=0x2B2D31
+    )
+    embed.add_field(name="Status", value="🟢 **Online & Active**", inline=True)
+    embed.add_field(name="Ping", value=f"⚡ **{latency}ms**", inline=True)
+    embed.set_footer(text=f"Last Checked: {now}")
+    return embed
+
+class BotStatusModal(discord.ui.Modal, title='Setup Bot Status Embed'):
+    emb_title = discord.ui.TextInput(
+        label='Status Title', 
+        default='🟢 Gulp Status', 
+        max_length=256
+    )
+    emb_desc = discord.ui.TextInput(
+        label='Custom Message', 
+        default='All systems operational. Bot is online and ready for requests.', 
+        style=discord.TextStyle.paragraph, 
+        max_length=4000
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        # Save the new text and the channel ID to memory
+        sticky_status["title"] = self.emb_title.value
+        sticky_status["desc"] = self.emb_desc.value
+        sticky_status["channel_id"] = interaction.channel.id
+
+        # Delete the old sticky message if one exists
+        if sticky_status["message_id"]:
+            try:
+                old_msg = await interaction.channel.fetch_message(sticky_status["message_id"])
+                await old_msg.delete()
+            except Exception:
+                pass
+
+        # Send the new one and save its ID
+        embed = create_status_embed(sticky_status["title"], sticky_status["desc"], interaction.client)
+        new_msg = await interaction.channel.send(embed=embed)
+        sticky_status["message_id"] = new_msg.id
+
+        await interaction.response.send_message("✅ Sticky bot status enabled! It will now lock to the bottom.", ephemeral=True)
+
+class StatusLaunchView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+
+    @discord.ui.button(label="⚙️ Create Sticky Status", style=discord.ButtonStyle.blurple)
+    async def open_status_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(BotStatusModal())
+        await interaction.message.delete()
+
+@bot.command(name="setupbotstatus")
+@commands.has_permissions(administrator=True)
+async def setup_bot_status(ctx: commands.Context):
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+    
+    await ctx.send(
+        content="Click the button below to setup your **Sticky Bot Status**:",
+        view=StatusLaunchView(),
+        delete_after=180
+    )
+
+# --- THE MAGIC TRIGGER ---
+# This listens for new messages and pushes the status down
+@bot.event
+async def on_message(message):
+    # CRITICAL: This line ensures your other commands (.nuke, .mute) don't break!
+    await bot.process_commands(message)
+
+    # Ignore messages from the bot itself to prevent infinite spam loops
+    if message.author == bot.user:
+        return
+
+    # If someone types in the status channel, move the embed down!
+    if sticky_status["channel_id"] == message.channel.id:
+        
+        # 1. Delete the old embed
+        if sticky_status["message_id"]:
+            try:
+                old_msg = await message.channel.fetch_message(sticky_status["message_id"])
+                await old_msg.delete()
+            except Exception:
+                pass
+        
+        # 2. Resend the embed at the bottom
+        embed = create_status_embed(sticky_status["title"], sticky_status["desc"], bot)
+        new_msg = await message.channel.send(embed=embed)
+        
+        # 3. Save the new message ID so we can delete it next time
+        sticky_status["message_id"] = new_msg.id
+
 
 bot.run(os.getenv("DISCORD_TOKEN"))
