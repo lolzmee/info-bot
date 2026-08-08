@@ -544,5 +544,129 @@ async def on_message(message):
         # 3. Save the new message ID so we can delete it next time
         sticky_status["message_id"] = new_msg.id
 
+# ---------------------------------------------------------
+# UNIVERSAL STICKY EMBED SYSTEM (.downembed)
+# ---------------------------------------------------------
+# This dictionary remembers the sticky embeds for every channel
+sticky_embeds = {}
+
+def create_sticky_embed(title, desc):
+    return discord.Embed(
+        title=title,
+        description=desc,
+        color=0x2B2D31  # Invisible seamless edge
+    )
+
+class StickyEmbedModal(discord.ui.Modal, title='Setup Sticky Embed'):
+    emb_title = discord.ui.TextInput(
+        label='Embed Title', 
+        default='Information', 
+        max_length=256
+    )
+    emb_desc = discord.ui.TextInput(
+        label='Embed Message', 
+        style=discord.TextStyle.paragraph, 
+        max_length=4000
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        channel_id = interaction.channel.id
+        
+        # Save the custom text to this specific channel's memory
+        sticky_embeds[channel_id] = {
+            "title": self.emb_title.value,
+            "desc": self.emb_desc.value,
+            "message_id": None
+        }
+
+        # Send the very first sticky message
+        embed = create_sticky_embed(self.emb_title.value, self.emb_desc.value)
+        new_msg = await interaction.channel.send(embed=embed)
+        
+        # Save the message ID so we know what to delete next time
+        sticky_embeds[channel_id]["message_id"] = new_msg.id
+
+        await interaction.response.send_message("📌 **Sticky embed active!** It will now lock to the bottom of this channel.", ephemeral=True)
+
+class StickyLaunchView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+
+    @discord.ui.button(label="📌 Create Sticky Embed", style=discord.ButtonStyle.green)
+    async def open_sticky_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(StickyEmbedModal())
+        await interaction.message.delete()
+
+@bot.command(name="downembed")
+@commands.has_permissions(administrator=True)
+async def setup_down_embed(ctx: commands.Context):
+    """Usage: .downembed (Creates an embed that stays at the bottom of the current channel)"""
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+    
+    await ctx.send(
+        content="Click the button below to setup a **Sticky Embed** for this channel:",
+        view=StickyLaunchView(),
+        delete_after=180
+    )
+
+@bot.command(name="removedownembed")
+@commands.has_permissions(administrator=True)
+async def remove_down_embed(ctx: commands.Context):
+    """Usage: .removedownembed (Stops the embed from sticking to the bottom)"""
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+
+    if ctx.channel.id in sticky_embeds:
+        # Delete the actual message from the channel
+        msg_id = sticky_embeds[ctx.channel.id]["message_id"]
+        if msg_id:
+            try:
+                old_msg = await ctx.channel.fetch_message(msg_id)
+                await old_msg.delete()
+            except Exception:
+                pass
+                
+        # Remove it from the bot's memory
+        del sticky_embeds[ctx.channel.id]
+        await ctx.send("✅ **Sticky embed removed** from this channel.", delete_after=5)
+    else:
+        await ctx.send("❌ There is no sticky embed active in this channel.", delete_after=5)
+
+# ---------------------------------------------------------
+# THE MAGIC TRIGGER (Replace your old on_message with this)
+# ---------------------------------------------------------
+@bot.event
+async def on_message(message):
+    # CRITICAL: This ensures your other commands (.nuke, .mute) still work
+    await bot.process_commands(message)
+
+    # Ignore messages from the bot itself to prevent infinite spam loops
+    if message.author == bot.user:
+        return
+
+    # Check if the channel has a sticky embed active
+    if message.channel.id in sticky_embeds:
+        sticky_data = sticky_embeds[message.channel.id]
+        
+        # 1. Delete the old embed
+        if sticky_data["message_id"]:
+            try:
+                old_msg = await message.channel.fetch_message(sticky_data["message_id"])
+                await old_msg.delete()
+            except Exception:
+                pass
+        
+        # 2. Resend the embed underneath the new message
+        embed = create_sticky_embed(sticky_data["title"], sticky_data["desc"])
+        new_msg = await message.channel.send(embed=embed)
+        
+        # 3. Update the message ID memory
+        sticky_embeds[message.channel.id]["message_id"] = new_msg.id
+
 
 bot.run(os.getenv("DISCORD_TOKEN"))
